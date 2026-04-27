@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef } from 'react';
 import AdminDashboard from '../components/AdminDashboard';
 import NetworkMonitor from '../components/NetworkMonitor'; 
-import { FaCloud, FaRobot, FaNetworkWired, FaLock, FaArrowLeft, FaPaperPlane } from 'react-icons/fa';
+import CCTVMonitor from '../components/CCTVMonitor'; 
+import { FaCloud, FaRobot, FaNetworkWired, FaLock, FaArrowLeft, FaPaperPlane, FaVideo } from 'react-icons/fa';
 
 export default function Pstar9CloudApp() {
   const [activeView, setActiveView] = useState('home'); 
@@ -19,7 +20,7 @@ export default function Pstar9CloudApp() {
   const [isLoading, setIsLoading] = useState(true);
   const [pinnedFileIds, setPinnedFileIds] = useState<string[]>([]);
 
-  // === STATE 10 SERVER PING ===
+  // STATE 10 SERVER PING
   const [monitoredServers, setMonitoredServers] = useState([
     { id: '1', name: 'Router Core', ip: '192.168.1.1', status: 'Memuat...', latency: 0 },
     { id: '2', name: 'Server NAS', ip: '192.168.10.10', status: 'Memuat...', latency: 0 },
@@ -31,29 +32,25 @@ export default function Pstar9CloudApp() {
   const chatEndRef = useRef<HTMLDivElement>(null);
   
   const [isMounted, setIsMounted] = useState(false);
-  const [isDataLoaded, setIsDataLoaded] = useState(false); // <--- KUNCI PENYELESAIAN MASALAH
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
 
-  // === MEMBACA BRANKAS SAAT WEB DIBUKA ===
+  // MEMBACA BRANKAS SAAT WEB DIBUKA
   useEffect(() => {
     setIsMounted(true);
     
-    // 1. Tarik memori Pin File
     const savedPins = localStorage.getItem('pstar9_pinned_files');
     if (savedPins) { try { setPinnedFileIds(JSON.parse(savedPins)); } catch (e) {} }
 
-    // 2. Tarik memori Target Server Ping yang dikonfigurasi Admin
     const savedServers = localStorage.getItem('pstar9_monitored_servers');
     if (savedServers) { 
       try { 
-        // Reset status ke 'Memuat...' agar tidak stuck
         const parsedServers = JSON.parse(savedServers).map((s: any) => ({...s, status: 'Memuat...', latency: 0}));
         setMonitoredServers(parsedServers); 
       } catch (e) {} 
     }
 
-    setIsDataLoaded(true); // <--- TANDAI BAHWA PROSES BACA SUDAH SELESAI
+    setIsDataLoaded(true);
 
-    // 3. Memuat Data Drive
     const fetchDriveData = async () => {
       try {
         const res = await fetch('/api/drive');
@@ -71,9 +68,9 @@ export default function Pstar9CloudApp() {
     fetchDriveData();
   }, []);
 
-  // === MENYIMPAN PERUBAHAN HANYA JIKA PROSES BACA SUDAH SELESAI ===
+  // MENYIMPAN PERUBAHAN
   useEffect(() => { 
-    if (isMounted && isDataLoaded) { // <--- CEGAH RACE CONDITION DI SINI
+    if (isMounted && isDataLoaded) { 
       localStorage.setItem('pstar9_pinned_files', JSON.stringify(pinnedFileIds));
       localStorage.setItem('pstar9_monitored_servers', JSON.stringify(monitoredServers));
     }
@@ -127,6 +124,7 @@ export default function Pstar9CloudApp() {
   return (
     <div className="min-h-screen bg-[#F9FAFB] text-slate-800 font-sans relative">
       
+      {/* MODAL LOGIN */}
       {showLoginModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in">
           <div className="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl relative">
@@ -147,6 +145,7 @@ export default function Pstar9CloudApp() {
         </div>
       )}
 
+      {/* NAVBAR */}
       <nav className="bg-white/90 backdrop-blur-md border-b border-gray-200 px-8 py-4 flex justify-between items-center sticky top-0 z-50 shadow-sm">
         <h1 onClick={() => setActiveView('home')} className="text-2xl font-bold tracking-tight cursor-pointer">Pstar9<span className="text-orange-500">Cloud.</span></h1>
         <div className="flex gap-4">
@@ -157,6 +156,7 @@ export default function Pstar9CloudApp() {
         </div>
       </nav>
 
+      {/* KONTEN UTAMA */}
       <main className="max-w-6xl mx-auto px-6 md:px-8 py-10">
         
         {activeView === 'home' && (
@@ -166,21 +166,26 @@ export default function Pstar9CloudApp() {
               <p className="text-lg text-gray-600">Kelola aset digital dan pantau jaringan Soko Mandiri.</p>
             </header>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
                 <div onClick={() => setActiveView('storage')} className="group bg-white p-8 rounded-3xl shadow-sm border border-gray-200 hover:border-orange-400 hover:shadow-xl cursor-pointer transition-all flex flex-col items-center text-center">
                   <FaCloud className="text-6xl text-orange-500 mb-6 group-hover:scale-110 transition-transform" />
                   <h3 className="text-xl font-bold mb-2">Pstar9 Storage</h3>
-                  <p className="text-gray-500 text-sm">Pusat manajemen galeri foto serta video terintegrasi.</p>
+                  <p className="text-gray-500 text-sm">Pusat manajemen galeri foto serta video.</p>
                 </div>
                 <div onClick={() => setActiveView('chat')} className="group bg-white p-8 rounded-3xl shadow-sm border border-gray-200 hover:border-orange-400 hover:shadow-xl cursor-pointer transition-all flex flex-col items-center text-center">
                   <FaRobot className="text-6xl text-orange-500 mb-6 group-hover:scale-110 transition-transform" />
                   <h3 className="text-xl font-bold mb-2">AI Assistant</h3>
-                  <p className="text-gray-500 text-sm">Asisten pintar untuk mencari file dan tanya jawab sistem.</p>
+                  <p className="text-gray-500 text-sm">Asisten pintar pencari file dan tanya jawab.</p>
                 </div>
                 <div onClick={() => setActiveView('network')} className="group bg-white p-8 rounded-3xl shadow-sm border border-gray-200 hover:border-orange-400 hover:shadow-xl cursor-pointer transition-all flex flex-col items-center text-center">
                   <FaNetworkWired className="text-6xl text-orange-500 mb-6 group-hover:scale-110 transition-transform" />
                   <h3 className="text-xl font-bold mb-2">Network Monitor</h3>
-                  <p className="text-gray-500 text-sm">Pusat diagnostik jaringan lokal dan Pstar9 Speedtest.</p>
+                  <p className="text-gray-500 text-sm">Diagnostik jaringan, server, dan Pstar9 Speedtest.</p>
+                </div>
+                <div onClick={() => setActiveView('cctv')} className="group bg-white p-8 rounded-3xl shadow-sm border border-gray-200 hover:border-orange-400 hover:shadow-xl cursor-pointer transition-all flex flex-col items-center text-center">
+                  <FaVideo className="text-6xl text-orange-500 mb-6 group-hover:scale-110 transition-transform" />
+                  <h3 className="text-xl font-bold mb-2">CCTV Monitor</h3>
+                  <p className="text-gray-500 text-sm">Pemantauan NVR & kamera keamanan Segmen 11.</p>
                 </div>
             </div>
           </div>
@@ -229,7 +234,6 @@ export default function Pstar9CloudApp() {
           </div>
         )}
 
-        {/* NETWORK VIEW PUBLIK */}
         {activeView === 'network' && (
           <NetworkMonitor 
             isAdmin={false} 
@@ -237,6 +241,15 @@ export default function Pstar9CloudApp() {
             setMonitoredServers={setMonitoredServers} 
           />
         )}
+
+        {activeView === 'cctv' && (
+          <CCTVMonitor 
+            isAdmin={isAdmin} 
+            monitoredServers={monitoredServers} 
+            setMonitoredServers={setMonitoredServers} 
+          />
+        )}
+
       </main>
     </div>
   );

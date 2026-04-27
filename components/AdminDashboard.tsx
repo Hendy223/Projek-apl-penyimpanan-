@@ -1,7 +1,8 @@
 'use client';
 
 import NetworkMonitor from './NetworkMonitor'; 
-import { FaChartPie, FaFolderOpen, FaNetworkWired, FaSignOutAlt, FaThumbtack } from 'react-icons/fa';
+import CCTVMonitor from './CCTVMonitor'; // <--- IMPORT COMPONENT CCTV BARU
+import { FaChartPie, FaFolderOpen, FaNetworkWired, FaSignOutAlt, FaThumbtack, FaVideo } from 'react-icons/fa';
 
 interface AdminDashboardProps {
   handleLogout: () => void;
@@ -15,7 +16,17 @@ interface AdminDashboardProps {
   setMonitoredServers: (servers: any[]) => void;
 }
 
-export default function AdminDashboard({ handleLogout, adminMenu, setAdminMenu, mediaAssets, pinnedFileIds, togglePin, isLoading, monitoredServers, setMonitoredServers }: AdminDashboardProps) {
+export default function AdminDashboard({ 
+  handleLogout, 
+  adminMenu, 
+  setAdminMenu, 
+  mediaAssets, 
+  pinnedFileIds, 
+  togglePin, 
+  isLoading, 
+  monitoredServers, 
+  setMonitoredServers 
+}: AdminDashboardProps) {
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-gray-50 text-slate-800 font-sans">
       
@@ -34,6 +45,9 @@ export default function AdminDashboard({ handleLogout, adminMenu, setAdminMenu, 
           </button>
           <button onClick={() => setAdminMenu('network_monitor')} className={`flex items-center gap-3 w-full text-left px-4 py-3 rounded-xl font-medium transition-colors ${adminMenu === 'network_monitor' ? 'bg-orange-500 text-white' : 'text-slate-300 hover:bg-slate-800'}`}>
             <FaNetworkWired /> Network Config & NOC
+          </button>
+          <button onClick={() => setAdminMenu('cctv_config')} className={`flex items-center gap-3 w-full text-left px-4 py-3 rounded-xl font-medium transition-colors ${adminMenu === 'cctv_config' ? 'bg-orange-500 text-white' : 'text-slate-300 hover:bg-slate-800'}`}>
+            <FaVideo /> CCTV Configuration
           </button>
         </div>
 
@@ -91,10 +105,20 @@ export default function AdminDashboard({ handleLogout, adminMenu, setAdminMenu, 
           </div>
         )}
 
-        {/* RENDER NETWORK MONITOR DALAM MODE ADMIN */}
         {adminMenu === 'network_monitor' && (
           <div className="animate-in fade-in pb-10 -m-4 md:-m-10"> 
              <NetworkMonitor 
+                isAdmin={true} 
+                monitoredServers={monitoredServers} 
+                setMonitoredServers={setMonitoredServers} 
+             />
+          </div>
+        )}
+
+        {/* PERBAIKAN DI SINI: MENAMBAHKAN PROPS KE CCTV MONITOR */}
+        {adminMenu === 'cctv_config' && (
+          <div className="animate-in fade-in pb-10 -m-4 md:-m-10"> 
+             <CCTVMonitor 
                 isAdmin={true} 
                 monitoredServers={monitoredServers} 
                 setMonitoredServers={setMonitoredServers} 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { FaGlobe, FaServer, FaTachometerAlt, FaWater, FaTerminal, FaSpinner, FaExchangeAlt, FaDownload, FaUpload, FaWifi, FaPlus, FaTrash, FaShieldAlt, FaHistory, FaNetworkWired, FaVideo, FaProjectDiagram, FaLaptop, FaVectorSquare, FaTimes, FaLink, FaCut, FaSave } from 'react-icons/fa';
+import { FaGlobe, FaServer, FaTachometerAlt, FaWater, FaTerminal, FaSpinner, FaExchangeAlt, FaDownload, FaUpload, FaWifi, FaPlus, FaTrash, FaShieldAlt, FaHistory, FaNetworkWired, FaVideo, FaProjectDiagram, FaLaptop, FaVectorSquare, FaTimes, FaLink, FaCut } from 'react-icons/fa';
 
 // IMPORT MESIN TOPOLOGI
 import { ReactFlow, Controls, Background, addEdge, applyNodeChanges, applyEdgeChanges, Handle, Position, ReactFlowProvider, useReactFlow, BackgroundVariant, NodeResizer } from '@xyflow/react';
@@ -33,17 +33,22 @@ const getDeviceIcon = (type: string) => {
   }
 };
 
+// ==========================================
+// CUSTOM NODE 1: PERANGKAT JARINGAN (BUG FIX STATUS)
+// ==========================================
 const CustomDeviceNode = ({ data }: any) => {
   const isDown = data.status === 'Putus';
   const isLooping = data.status === 'Looping';
   const isLoading = data.status === 'Memuat...' || !data.status;
   
+  // Logika warna border (garis pinggir)
   let borderColor = 'border-slate-200 hover:border-orange-500';
   if (isDown) borderColor = 'border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.5)]';
   else if (isLooping) borderColor = 'border-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.5)]';
   else if (data.status === 'Lancar') borderColor = 'border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.3)]';
 
-  let badgeClass = 'bg-slate-100 text-slate-500 animate-pulse'; 
+  // Logika warna badge (kotak kecil status)
+  let badgeClass = 'bg-slate-100 text-slate-500 animate-pulse'; // Default loading abu-abu
   if (isDown) badgeClass = 'bg-red-100 text-red-600';
   else if (isLooping) badgeClass = 'bg-amber-100 text-amber-600';
   else if (data.status === 'Lancar') badgeClass = 'bg-emerald-100 text-emerald-600';
@@ -60,6 +65,8 @@ const CustomDeviceNode = ({ data }: any) => {
       <div className="text-center w-full">
         <p className="text-xs font-extrabold text-slate-800 uppercase tracking-wide truncate" title={data.label}>{data.label}</p>
         <p className="text-[10px] font-mono text-slate-500 mt-1 bg-slate-100 px-2 py-0.5 rounded-md inline-block">{data.ip}</p>
+        
+        {/* PERBAIKAN: Selalu tampilkan badge, walaupun sedang loading */}
         <p className={`text-[9px] font-bold mt-2 px-2 py-0.5 rounded-full ${badgeClass}`}>
           {data.status || 'Memuat...'} {(!isLoading && !isDown && data.latency !== undefined) ? `(${data.latency}ms)` : ''}
         </p>
@@ -71,6 +78,9 @@ const CustomDeviceNode = ({ data }: any) => {
   );
 };
 
+// ==========================================
+// CUSTOM NODE 2: AREA RUANGAN
+// ==========================================
 const AreaNode = ({ data, selected }: any) => {
   return (
     <>
@@ -87,38 +97,35 @@ const nodeTypes = { customDevice: CustomDeviceNode, areaNode: AreaNode };
 // ==========================================
 // KOMPONEN TOPOLOGI BUILDER INTERAKTIF
 // ==========================================
-const TopologyBuilder = ({ monitoredServers, setMonitoredServers, isReadOnly = false }: any) => {
+const TopologyBuilder = ({ monitoredServers, setMonitoredServers }: any) => {
   const [nodes, setNodes] = useState<any[]>([]);
   const [edges, setEdges] = useState<any[]>([]);
   const { screenToFlowPosition } = useReactFlow();
 
   const [editingNode, setEditingNode] = useState<any>(null);
   const [editForm, setEditForm] = useState({ label: '', ip: '' });
-  
-  // STATE KABEL (EDGE) SEKARANG PUNYA WARNA/TIPE
+
   const [editingEdge, setEditingEdge] = useState<any>(null);
-  const [edgeForm, setEdgeForm] = useState({ label: '', cableType: 'lan' });
-  const [isSaving, setIsSaving] = useState(false);
+  const [edgeForm, setEdgeForm] = useState({ label: '' });
 
   useEffect(() => {
-    fetch('/api/topology')
-      .then(res => res.json())
-      .then(data => {
-        if (data.nodes && data.nodes.length > 0) {
-           setNodes(data.nodes);
-           const extractedServers = data.nodes
-             .filter((n: any) => n.type === 'customDevice')
-             .map((n: any) => ({
-                id: n.id, name: n.data.label, ip: n.data.ip, type: n.data.type, status: 'Memuat...', latency: 0
-             }));
-           setMonitoredServers(extractedServers);
-        }
-        if (data.edges && data.edges.length > 0) setEdges(data.edges);
-      })
-      .catch(err => console.log('Belum ada database topologi'));
-  }, [setMonitoredServers]);
+    const savedNodes = localStorage.getItem('pstar9_topo_nodes');
+    const savedEdges = localStorage.getItem('pstar9_topo_edges');
+    if (savedNodes && savedNodes !== '[]') {
+      setNodes(JSON.parse(savedNodes));
+      if (savedEdges && savedEdges !== '[]') {
+        const parsedEdges = JSON.parse(savedEdges).map((e: any) => ({ ...e, type: 'smoothstep' }));
+        setEdges(parsedEdges);
+      }
+    }
+  }, []);
 
   useEffect(() => {
+    if (nodes.length > 0 || edges.length > 0) {
+      localStorage.setItem('pstar9_topo_nodes', JSON.stringify(nodes));
+      localStorage.setItem('pstar9_topo_edges', JSON.stringify(edges));
+    }
+
     setNodes((nds) => nds.map((n) => {
       if (n.type === 'customDevice') {
         const server = monitoredServers.find((s: any) => s.id === n.id);
@@ -129,38 +136,32 @@ const TopologyBuilder = ({ monitoredServers, setMonitoredServers, isReadOnly = f
       return n;
     }));
 
-    // LOGIKA WARNA KABEL LAN vs FO
     setEdges((eds) => eds.map((e) => {
       const targetServer = monitoredServers.find((s: any) => s.id === e.target);
       const sourceServer = monitoredServers.find((s: any) => s.id === e.source);
       const isDown = targetServer?.status === 'Putus' || sourceServer?.status === 'Putus';
-      
-      const type = e.data?.cableType || 'lan';
-      let activeColor = '#10b981'; // Hijau (LAN Default)
-      if (type === 'fo_blue') activeColor = '#3b82f6'; // Biru (FO)
-      if (type === 'fo_gray') activeColor = '#64748b'; // Abu-abu (FO)
-
       return { 
         ...e, 
         type: 'smoothstep', 
         animated: !isDown, 
-        style: { ...e.style, stroke: isDown ? '#ef4444' : activeColor, strokeWidth: 3 } 
+        style: { ...e.style, stroke: isDown ? '#ef4444' : '#10b981', strokeWidth: 3 } 
       };
     }));
+
   }, [nodes.length, edges.length, monitoredServers]);
 
   const onNodesChange = useCallback((changes: any) => setNodes((nds) => applyNodeChanges(changes, nds)), []);
   const onEdgesChange = useCallback((changes: any) => setEdges((eds) => applyEdgeChanges(changes, eds)), []);
-  
-  // DEFAULT SAAT DITARIK ADALAH LAN (Hijau)
-  const onConnect = useCallback((params: any) => setEdges((eds) => addEdge({ ...params, type: 'smoothstep', animated: true, data: { cableType: 'lan' }, style: { stroke: '#10b981', strokeWidth: 3 } }, eds)), []);
+  const onConnect = useCallback((params: any) => setEdges((eds) => addEdge({ ...params, type: 'smoothstep', animated: true, style: { stroke: '#10b981', strokeWidth: 3 } }, eds)), []);
 
   const onNodesDelete = useCallback((deletedNodes: any[]) => {
     const deletedIds = deletedNodes.map(n => n.id);
-    if (!isReadOnly) setMonitoredServers((prev: any[]) => prev.filter(s => !deletedIds.includes(s.id)));
-  }, [setMonitoredServers, isReadOnly]);
+    setMonitoredServers((prev: any[]) => prev.filter(s => !deletedIds.includes(s.id)));
+  }, [setMonitoredServers]);
 
-  const onDragOver = useCallback((event: any) => { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; }, []);
+  const onDragOver = useCallback((event: any) => {
+    event.preventDefault(); event.dataTransfer.dropEffect = 'move';
+  }, []);
 
   const onDrop = useCallback((event: any) => {
       event.preventDefault();
@@ -205,20 +206,20 @@ const TopologyBuilder = ({ monitoredServers, setMonitoredServers, isReadOnly = f
   };
 
   const onEdgeDoubleClick = useCallback((event: any, edge: any) => {
-    event.preventDefault(); 
-    setEditingEdge(edge); 
-    setEdgeForm({ label: edge.label || '', cableType: edge.data?.cableType || 'lan' });
+    event.preventDefault();
+    setEditingEdge(edge);
+    setEdgeForm({ label: edge.label || '' });
   }, []);
 
   const handleSaveEdgeEdit = () => {
     setEdges((eds) => eds.map((e) => {
       if (e.id === editingEdge.id) {
         return {
-          ...e, 
-          label: edgeForm.label, 
-          data: { ...e.data, cableType: edgeForm.cableType }, // SIMPAN WARNA KABEL
+          ...e,
+          label: edgeForm.label,
           labelStyle: { fill: '#334155', fontWeight: 800, fontSize: 10, fontFamily: 'monospace' },
-          labelBgStyle: { fill: '#f8fafc', stroke: '#cbd5e1', strokeWidth: 1, rx: 6, ry: 6 }, labelBgPadding: [8, 4],
+          labelBgStyle: { fill: '#f8fafc', stroke: '#cbd5e1', strokeWidth: 1, rx: 6, ry: 6 },
+          labelBgPadding: [8, 4],
         };
       }
       return e;
@@ -227,36 +228,23 @@ const TopologyBuilder = ({ monitoredServers, setMonitoredServers, isReadOnly = f
   };
 
   const handleDeleteEdge = () => {
-    if (window.confirm('Putuskan koneksi kabel ini?')) { setEdges((eds) => eds.filter((e) => e.id !== editingEdge.id)); setEditingEdge(null); }
-  };
-
-  const saveTopologyToServer = async () => {
-    setIsSaving(true);
-    try {
-      await fetch('/api/topology', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nodes, edges })
-      });
-      alert('Berhasil disimpan permanen ke server! Sekarang aman walau di-refresh atau dibuka di HP.');
-    } catch(e) {
-      alert('Gagal menyimpan ke server.');
-    } finally {
-      setIsSaving(false);
+    if (window.confirm('Putuskan koneksi kabel ini?')) {
+      setEdges((eds) => eds.filter((e) => e.id !== editingEdge.id));
+      setEditingEdge(null);
     }
   };
 
-  const clearTopology = async () => { 
+  const clearTopology = () => { 
     if(window.confirm('Yakin ingin menghapus seluruh peta dan menghentikan semua monitoring?')) { 
-      setNodes([]); setEdges([]); setMonitoredServers([]); 
-      try { await fetch('/api/topology', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nodes: [], edges: [] }) }); } catch(e) {}
+      setNodes([]); setEdges([]); setMonitoredServers([]); localStorage.removeItem('pstar9_topo_nodes'); localStorage.removeItem('pstar9_topo_edges');
     } 
   };
 
   return (
-    <div className={`flex flex-col w-full bg-slate-50 relative ${isReadOnly ? 'h-full' : 'h-[85vh] min-h-[750px] rounded-2xl border border-slate-200 shadow-inner overflow-hidden'}`}>
+    <div className="flex flex-col h-[85vh] min-h-[750px] w-full bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden shadow-inner relative">
       
-      {!isReadOnly && editingNode && (
+      {/* POP-UP MODAL EDIT NODE */}
+      {editingNode && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-in fade-in">
           <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl relative">
             <button onClick={() => setEditingNode(null)} className="absolute top-4 right-4 text-gray-400 hover:text-slate-800"><FaTimes className="text-xl"/></button>
@@ -284,27 +272,22 @@ const TopologyBuilder = ({ monitoredServers, setMonitoredServers, isReadOnly = f
         </div>
       )}
 
-      {/* POP-UP KABEL DENGAN PILIHAN WARNA FO */}
-      {!isReadOnly && editingEdge && (
+      {/* POP-UP MODAL EDIT KABEL */}
+      {editingEdge && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-in fade-in">
           <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl relative border-t-4 border-emerald-500">
             <button onClick={() => setEditingEdge(null)} className="absolute top-4 right-4 text-gray-400 hover:text-slate-800"><FaTimes className="text-xl"/></button>
-            <div className="flex items-center gap-3 mb-6"><div className="p-3 bg-emerald-100 text-emerald-600 rounded-full"><FaLink className="text-xl"/></div><div><h3 className="font-bold text-lg text-slate-900">Edit Koneksi</h3><p className="text-xs text-gray-500">Ubah label dan jenis kabel.</p></div></div>
+            <div className="flex items-center gap-3 mb-6">
+               <div className="p-3 bg-emerald-100 text-emerald-600 rounded-full"><FaLink className="text-xl"/></div>
+               <div><h3 className="font-bold text-lg text-slate-900">Edit Koneksi</h3><p className="text-xs text-gray-500">Ubah label kabel jaringan.</p></div>
+            </div>
             <div className="space-y-4">
               <div>
-                 <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Jenis Kabel</label>
-                 <select value={edgeForm.cableType} onChange={(e) => setEdgeForm({...edgeForm, cableType: e.target.value})} className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm font-semibold focus:ring-2 focus:ring-emerald-500 outline-none">
-                    <option value="lan">LAN / UTP (Hijau)</option>
-                    <option value="fo_blue">Fiber Optic (Biru)</option>
-                    <option value="fo_gray">Fiber Optic (Abu-abu)</option>
-                 </select>
-              </div>
-              <div>
-                 <label className="text-xs font-bold text-gray-500 uppercase mb-1 block mt-2">Label Teks (Opsional)</label>
-                 <input type="text" value={edgeForm.label} onChange={(e) => setEdgeForm({...edgeForm, label: e.target.value})} placeholder="Cth: Port 1, Backbone 10G" className="w-full border border-gray-300 rounded-xl px-4 py-3 font-mono text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none"/>
+                 <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Label Kabel (Opsional)</label>
+                 <input type="text" value={edgeForm.label} onChange={(e) => setEdgeForm({...edgeForm, label: e.target.value})} placeholder="Cth: Port 1, Fiber 10G" className="w-full border border-gray-300 rounded-xl px-4 py-3 font-mono text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none"/>
               </div>
               <div className="flex gap-3 mt-6">
-                <button onClick={handleDeleteEdge} className="flex-1 bg-red-50 text-red-600 font-bold rounded-xl px-4 py-3.5 hover:bg-red-600 hover:text-white transition-colors border border-red-200 flex justify-center items-center gap-2"><FaCut/> Putus</button>
+                <button onClick={handleDeleteEdge} className="flex-1 bg-red-50 text-red-600 font-bold rounded-xl px-4 py-3.5 hover:bg-red-600 hover:text-white transition-colors border border-red-200 flex justify-center items-center gap-2"><FaCut/> Putus Kabel</button>
                 <button onClick={handleSaveEdgeEdit} className="flex-1 bg-slate-900 text-white font-bold rounded-xl px-4 py-3.5 hover:bg-emerald-500 transition-colors">Simpan</button>
               </div>
             </div>
@@ -312,50 +295,43 @@ const TopologyBuilder = ({ monitoredServers, setMonitoredServers, isReadOnly = f
         </div>
       )}
 
-      {!isReadOnly && (
-        <div className="w-full bg-white border-b border-slate-200 p-3 flex items-center gap-4 overflow-x-auto z-10 shadow-sm shrink-0">
-          <div className="flex flex-col pr-4 border-r border-slate-200 shrink-0">
-            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Device Palette</h3>
-            <p className="text-[9px] text-gray-500">Tarik ikon ke bawah ⬇️</p>
-          </div>
-          <div className="flex gap-2 items-center">
-            {['Area Ruangan', 'Router', 'Switch', 'Server', 'PC', 'Access Point', 'Firewall', 'CCTV'].map((type) => (
-              <div key={type} onDragStart={(e) => e.dataTransfer.setData('application/reactflow', type)} draggable className="flex items-center gap-2 p-2 px-3 bg-slate-50 border border-slate-200 rounded-xl cursor-grab hover:bg-orange-50 hover:border-orange-300 hover:shadow-md transition-all active:cursor-grabbing whitespace-nowrap">
-                {getDeviceIcon(type)}
-                <span className="text-xs font-bold text-slate-700">{type}</span>
-              </div>
-            ))}
-          </div>
-          
-          <button onClick={saveTopologyToServer} disabled={isSaving} className="ml-auto flex items-center justify-center gap-2 bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold text-xs hover:bg-emerald-500 transition-all shrink-0">
-            {isSaving ? <FaSpinner className="animate-spin" /> : <FaSave />} Simpan Posisi
-          </button>
-
-          <button onClick={clearTopology} className="flex items-center justify-center gap-2 bg-red-50 text-red-500 border border-red-200 px-4 py-2.5 rounded-xl font-bold text-xs hover:bg-red-500 hover:text-white transition-all shrink-0">
-            <FaTrash /> Bersihkan
-          </button>
+      {/* TOP-BAR PALETTE */}
+      <div className="w-full bg-white border-b border-slate-200 p-3 flex items-center gap-4 overflow-x-auto z-10 shadow-sm shrink-0">
+        <div className="flex flex-col pr-4 border-r border-slate-200 shrink-0">
+          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Device Palette</h3>
+          <p className="text-[9px] text-gray-500">Tarik ikon ke bawah ⬇️</p>
         </div>
-      )}
+        <div className="flex gap-2 items-center">
+          {['Area Ruangan', 'Router', 'Switch', 'Server', 'PC', 'Access Point', 'Firewall', 'CCTV'].map((type) => (
+            <div key={type} onDragStart={(e) => e.dataTransfer.setData('application/reactflow', type)} draggable className="flex items-center gap-2 p-2 px-3 bg-slate-50 border border-slate-200 rounded-xl cursor-grab hover:bg-orange-50 hover:border-orange-300 hover:shadow-md transition-all active:cursor-grabbing whitespace-nowrap">
+              {getDeviceIcon(type)}
+              <span className="text-xs font-bold text-slate-700">{type}</span>
+            </div>
+          ))}
+        </div>
+        <button onClick={clearTopology} className="ml-auto flex items-center justify-center gap-2 bg-red-50 text-red-500 border border-red-200 px-4 py-2.5 rounded-xl font-bold text-xs hover:bg-red-500 hover:text-white transition-all shrink-0">
+          <FaTrash /> Bersihkan
+        </button>
+      </div>
 
-      <div className="flex-1 w-full relative" onDragOver={!isReadOnly ? onDragOver : undefined} onDrop={!isReadOnly ? onDrop : undefined}>
+      {/* CANVAS REACT FLOW */}
+      <div className="flex-1 w-full relative" onDragOver={onDragOver} onDrop={onDrop}>
+        
         <div className="absolute top-6 right-6 z-10 bg-white/95 backdrop-blur-md p-4 rounded-2xl shadow-xl border border-slate-200 pointer-events-none">
            <h4 className="text-xs font-extrabold text-slate-800 mb-3 uppercase tracking-wider">Keterangan Indikator</h4>
-           <div className="flex items-center gap-3 mb-2">
-             <div className="flex gap-1"><div className="w-3 h-3 rounded-full bg-emerald-500"></div><div className="w-3 h-3 rounded-full bg-blue-500"></div></div>
-             <span className="text-xs font-bold text-slate-600">Lancar (LAN / FO)</span>
-           </div>
+           <div className="flex items-center gap-3 mb-2"><div className="w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]"></div><span className="text-xs font-bold text-slate-600">Lancar (Kabel Mengalir)</span></div>
            <div className="flex items-center gap-3 mb-2"><div className="w-3 h-3 rounded-full bg-amber-500 shadow-[0_0_8px_#f59e0b]"></div><span className="text-xs font-bold text-slate-600">Delay / Ping Tinggi</span></div>
-           <div className="flex items-center gap-3"><div className="w-3 h-3 rounded-full bg-red-500 shadow-[0_0_8px_#ef4444]"></div><span className="text-xs font-bold text-slate-600">Terputus (Kabel Merah)</span></div>
-           {!isReadOnly && <div className="mt-3 pt-3 border-t border-slate-100 text-[9px] text-gray-400"><strong>TIPS:</strong> Klik 2x Kabel untuk Ubah ke FO/Biru.</div>}
+           <div className="flex items-center gap-3"><div className="w-3 h-3 rounded-full bg-red-500 shadow-[0_0_8px_#ef4444]"></div><span className="text-xs font-bold text-slate-600">Terputus (Kabel Berhenti)</span></div>
+           <div className="mt-3 pt-3 border-t border-slate-100 text-[9px] text-gray-400"><strong>TIPS:</strong> Klik 2x pada Alat atau Kabel untuk Mengedit.</div>
         </div>
 
         <ReactFlow 
           nodes={nodes} edges={edges} 
-          onNodesChange={!isReadOnly ? onNodesChange : undefined} onEdgesChange={!isReadOnly ? onEdgesChange : undefined} 
-          onConnect={!isReadOnly ? onConnect : undefined} onNodeDoubleClick={!isReadOnly ? onNodeDoubleClick : undefined} 
-          onEdgeDoubleClick={!isReadOnly ? onEdgeDoubleClick : undefined} onNodesDelete={!isReadOnly ? onNodesDelete : undefined} 
-          nodeTypes={nodeTypes} fitView deleteKeyCode={!isReadOnly ? ['Backspace', 'Delete'] : null}
-          nodesDraggable={!isReadOnly} nodesConnectable={!isReadOnly} elementsSelectable={!isReadOnly} 
+          onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} 
+          onConnect={onConnect} onNodeDoubleClick={onNodeDoubleClick} 
+          onEdgeDoubleClick={onEdgeDoubleClick} 
+          onNodesDelete={onNodesDelete} 
+          nodeTypes={nodeTypes} fitView deleteKeyCode={['Backspace', 'Delete']}
         >
           <Background variant={BackgroundVariant.Dots} color="#94a3b8" gap={24} size={2} />
           <Controls className="bg-white shadow-lg border-slate-200 rounded-lg overflow-hidden" />
@@ -466,7 +442,7 @@ export default function NetworkMonitor({ isAdmin, monitoredServers, setMonitored
                 <div className="flex justify-between items-center mb-4 px-2">
                   <div><h3 className="text-xl font-bold text-slate-900 flex items-center gap-2"><FaProjectDiagram className="text-orange-500"/> Network Topology Builder</h3></div>
                 </div>
-                <ReactFlowProvider><TopologyBuilder monitoredServers={monitoredServers} setMonitoredServers={setMonitoredServers} isReadOnly={false} /></ReactFlowProvider>
+                <ReactFlowProvider><TopologyBuilder monitoredServers={monitoredServers} setMonitoredServers={setMonitoredServers} /></ReactFlowProvider>
               </div>
             )}
 
@@ -506,6 +482,7 @@ export default function NetworkMonitor({ isAdmin, monitoredServers, setMonitored
     );
   }
 
+  // TAMPILAN PUBLIK
   return (
     <div className="max-w-5xl mx-auto animate-in fade-in duration-500 space-y-8">
       <div className="bg-white rounded-3xl border border-gray-200 shadow-sm p-6 md:p-8 flex flex-col sm:flex-row justify-between items-center gap-4">
@@ -515,19 +492,7 @@ export default function NetworkMonitor({ isAdmin, monitoredServers, setMonitored
       {speedResult && !isSpeedtesting && (
          <div className="grid grid-cols-3 gap-4 bg-slate-900 p-8 rounded-3xl text-center"><div className="text-emerald-400"><p className="text-sm font-bold text-gray-400">PING</p><p className="text-4xl font-bold">{speedResult.ping} ms</p></div><div className="text-blue-400 border-x border-slate-700"><p className="text-sm font-bold text-gray-400">DOWNLOAD</p><p className="text-4xl font-bold">{speedResult.download} Mbps</p></div><div className="text-purple-400"><p className="text-sm font-bold text-gray-400">UPLOAD</p><p className="text-4xl font-bold">{speedResult.upload} Mbps</p></div></div>
       )}
-
-      <div className="bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden p-6 md:p-8">
-        <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
-          <FaProjectDiagram className="text-orange-500"/> Live Network Topology
-        </h3>
-        <div className="h-[500px] md:h-[600px] w-full rounded-2xl border border-slate-200 overflow-hidden bg-slate-50 relative">
-           <ReactFlowProvider>
-              <TopologyBuilder monitoredServers={monitoredServers} setMonitoredServers={setMonitoredServers} isReadOnly={true} />
-           </ReactFlowProvider>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
         {monitoredServers.map((server) => {
           let color = 'bg-gray-100 text-gray-500 border-gray-200';
           if (server.status === 'Lancar') color = 'bg-emerald-50 text-emerald-700 border-emerald-200 shadow-emerald-100';
